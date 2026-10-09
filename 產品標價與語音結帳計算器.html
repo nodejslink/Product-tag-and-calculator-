@@ -1,0 +1,403 @@
+<!DOCTYPE html>
+<html lang="zh-TW">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>麵店產品標價與自動結帳計算</title>
+    <script src="https://cdn.tailwindcss.com"></script>
+    <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css">
+    <link href="https://fonts.googleapis.com/css2?family=Noto+Sans+TC:wght@400;500;700;900&display=swap" rel="stylesheet">
+    <script>
+        tailwind.config = {
+            theme: {
+                extend: {
+                    fontFamily: {
+                        sans: ['Noto Sans TC', 'sans-serif'],
+                    },
+                    colors: {
+                        amber: {
+                            50: '#fffbeb',
+                            100: '#fef3c7',
+                            500: '#f59e0b',
+                            600: '#d97706',
+                            700: '#b45309',
+                            800: '#92400e',
+                            900: '#78350f',
+                        }
+                    }
+                }
+            }
+        }
+    </script>
+    <style>
+        body {
+            font-family: 'Noto Sans TC', sans-serif;
+            background-color: #fcf8f2;
+            -webkit-tap-highlight-color: transparent;
+        }
+        /* Custom scrollbar */
+        ::-webkit-scrollbar {
+            width: 6px;
+        }
+        ::-webkit-scrollbar-track {
+            background: #f1f1f1;
+        }
+        ::-webkit-scrollbar-thumb {
+            background: #d97706;
+            border-radius: 4px;
+        }
+    </style>
+</head>
+<body class="min-h-screen text-gray-800 pb-28 md:pb-12">
+
+    <header class="bg-amber-800 text-white shadow-md sticky top-0 z-30">
+        <div class="max-w-5xl mx-auto px-4 py-3.5 flex justify-between items-center">
+            <div class="flex items-center gap-3">
+                <div class="bg-amber-600 p-2 rounded-xl text-amber-100 shadow-inner">
+                    <i class="fa-solid font-bold fa-bowl-food text-2xl"></i>
+                </div>
+                <div>
+                    <h1 class="text-xl font-black tracking-wide leading-tight">鮮麵手工坊</h1>
+                    <p class="text-xs text-amber-200">產品標價與快速結帳系統</p>
+                </div>
+            </div>
+            <div class="flex gap-2">
+                <button onclick="speakText('歡迎光臨鮮麵手工坊！')" title="朗讀歡迎詞" class="p-2.5 bg-amber-700/80 hover:bg-amber-600 rounded-lg text-amber-100 transition active:scale-95">
+                    <i class="fa-solid fa-volume-high text-lg"></i>
+                </button>
+                <button onclick="resetAll()" class="px-3 py-1.5 bg-red-600/90 hover:bg-red-600 text-white rounded-lg text-sm font-bold flex items-center gap-1.5 shadow transition active:scale-95">
+                    <i class="fa-solid fa-rotate-left"></i>
+                    <span class="hidden sm:inline">清除重置</span>
+                </button>
+            </div>
+        </div>
+    </header>
+
+    <main class="max-w-5xl mx-auto px-4 py-6">
+
+        <div class="mb-6 bg-amber-100/70 border border-amber-200 rounded-2xl p-4 flex flex-col md:flex-row justify-between items-center gap-4 shadow-sm">
+            <div class="flex items-center gap-3 text-amber-900">
+                <i class="fa-solid fa-circle-info text-amber-600 text-xl flex-shrink-0"></i>
+                <p class="text-sm">
+                    點擊產品旁的 <i class="fa-solid fa-volume-high text-amber-600 mx-1"></i> 可單獨朗讀標價；點選數量即可加入結帳清單！
+                </p>
+            </div>
+            <div class="flex items-center gap-2 w-full md:w-auto justify-end">
+                <span class="text-xs font-bold text-amber-800 whitespace-nowrap">語音速度:</span>
+                <input type="range" id="speechRate" min="0.7" max="1.3" step="0.1" value="1" class="w-24 accent-amber-600 cursor-pointer">
+            </div>
+        </div>
+
+        <div class="grid grid-cols-1 lg:grid-cols-3 gap-6">
+
+            <div class="lg:col-span-2 space-y-4">
+                <div class="flex justify-between items-center px-1">
+                    <h2 class="text-lg font-bold text-amber-900 flex items-center gap-2">
+                        <i class="fa-solid fa-list-check text-amber-600"></i>
+                        產品單價表
+                    </h2>
+                    <span class="text-xs bg-amber-200 text-amber-800 px-2.5 py-1 rounded-full font-medium" id="itemCountTag">共 12 項商品</span>
+                </div>
+
+                <!-- Products Grid -->
+                <div class="grid grid-cols-1 sm:grid-cols-2 gap-3" id="productGrid">
+                    <!-- Products will be injected by JS -->
+                </div>
+            </div>
+
+            <div class="lg:col-span-1">
+                <div class="bg-white rounded-2xl shadow-lg border border-amber-200/80 p-5 sticky top-20 flex flex-col justify-between">
+                    <div>
+                        <div class="flex justify-between items-center pb-3 border-b border-gray-100 mb-4">
+                            <h2 class="text-lg font-bold text-amber-900 flex items-center gap-2">
+                                <i class="fa-solid fa-receipt text-amber-600"></i>
+                                購物結帳單
+                            </h2>
+                            <button onclick="resetAll()" class="text-xs text-red-500 hover:text-red-700 underline font-medium">
+                                清空清單
+                            </button>
+                        </div>
+
+                        <!-- Selected items list -->
+                        <div id="cartList" class="space-y-3 max-h-64 overflow-y-auto pr-1 mb-4">
+                            <!-- Injected by JS -->
+                        </div>
+                    </div>
+
+                    <!-- Summary & Actions -->
+                    <div class="border-t border-amber-100 pt-4 mt-2">
+                        <div class="flex justify-between items-center mb-1">
+                            <span class="text-sm text-gray-500">總數量</span>
+                            <span class="text-base font-bold text-gray-800" id="totalQty">0 件</span>
+                        </div>
+                        <div class="flex justify-between items-baseline mb-5">
+                            <span class="text-base font-bold text-amber-900">結帳總金額</span>
+                            <div class="text-right">
+                                <span class="text-3xl font-black text-amber-600" id="totalAmount">$0</span>
+                            </div>
+                        </div>
+
+                        <!-- Action Buttons -->
+                        <div class="space-y-2">
+                            <button id="speakTotalBtn" onclick="speakSummary()" class="w-full bg-amber-600 hover:bg-amber-700 active:bg-amber-800 text-white py-3 px-4 rounded-xl font-bold flex items-center justify-center gap-2 shadow-md hover:shadow-lg transition">
+                                <i class="fa-solid fa-volume-high text-lg"></i>
+                                <span>朗讀金額與明細</span>
+                            </button>
+                        </div>
+                    </div>
+                </div>
+            </div>
+
+        </div>
+    </main>
+
+    <div class="fixed bottom-0 left-0 right-0 bg-white border-t border-amber-200 shadow-[0_-4px_20px_rgba(0,0,0,0.1)] p-3 lg:hidden z-20">
+        <div class="max-w-md mx-auto flex items-center justify-between gap-3">
+            <div>
+                <div class="text-xs text-gray-500">已選 <span id="mobileTotalQty" class="font-bold text-amber-700">0</span> 件</div>
+                <div class="text-xl font-black text-amber-600" id="mobileTotalAmount">$0</div>
+            </div>
+            <div class="flex gap-2">
+                <button onclick="speakSummary()" class="bg-amber-600 active:bg-amber-700 text-white px-4 py-2.5 rounded-xl font-bold text-sm flex items-center gap-1.5 shadow">
+                    <i class="fa-solid fa-volume-high"></i>
+                    <span>朗讀</span>
+                </button>
+                <button onclick="scrollToCart()" class="bg-amber-800 active:bg-amber-900 text-white px-4 py-2.5 rounded-xl font-bold text-sm shadow">
+                    <span>查明細</span>
+                </button>
+            </div>
+        </div>
+    </div>
+
+    <div id="toast" class="fixed bottom-20 left-1/2 transform -translate-x-1/2 bg-gray-900/90 text-white px-4 py-2 rounded-full text-sm font-medium shadow-lg transition-opacity duration-300 opacity-0 pointer-events-none z-50 flex items-center gap-2">
+        <i class="fa-solid fa-circle-check text-green-400"></i>
+        <span id="toastMsg">提示訊息</span>
+    </div>
+
+    <script>
+        // 產品資料庫
+        const products = [
+            { id: 1, name: "水餃皮", unit: "一包", price: 40, icon: "fa-cookie" },
+            { id: 2, name: "油麵", unit: "1斤", price: 30, icon: "fa-bowl-rice" },
+            { id: 3, name: "陽春麵", unit: "一個", price: 6, icon: "fa-utensils" },
+            { id: 4, name: "牛肉麵", unit: "1斤", price: 35, icon: "fa-bowl-food" },
+            { id: 5, name: "大拉麵", unit: "1斤", price: 35, icon: "fa-cloud" },
+            { id: 6, name: "小拉麵", unit: "1斤", price: 35, icon: "fa-cloud-meatball" },
+            { id: 7, name: "寬版面", unit: "1斤", price: 35, icon: "fa-bars" },
+            { id: 8, name: "小陽春麵", unit: "1斤", price: 35, icon: "fa-mortar-pestle" },
+            { id: 9, name: "粿仔麵", unit: "1斤", price: 35, icon: "fa-sheet-plastic" },
+            { id: 10, name: "油蔥", unit: "一罐", price: 120, icon: "fa-jar" },
+            { id: 11, name: "麻醬包", unit: "一組", price: 30, icon: "fa-box-tissue" },
+            { id: 12, name: "麵線", unit: "一捆", price: 20, icon: "fa-scroll" }
+        ];
+
+        // 數量狀態 (key: productId, value: quantity)
+        let cart = {};
+
+        // 初始化
+        window.addEventListener('DOMContentLoaded', () => {
+            renderProducts();
+            updateSummary();
+        });
+
+        function renderProducts() {
+            const grid = document.getElementById('productGrid');
+            grid.innerHTML = products.map(product => {
+                const qty = cart[product.id] || 0;
+                const isSelected = qty > 0;
+
+                return `
+                    <div id="card-${product.id}" class="bg-white rounded-xl border ${isSelected ? 'border-amber-500 ring-2 ring-amber-400/30 bg-amber-50/30' : 'border-gray-200'} p-4 shadow-sm hover:shadow-md transition flex flex-col justify-between">
+                        <div class="flex justify-between items-start mb-2">
+                            <div class="flex items-center gap-2.5">
+                                <span class="w-8 h-8 rounded-lg ${isSelected ? 'bg-amber-600 text-white' : 'bg-amber-100 text-amber-800'} flex items-center justify-center font-bold text-sm">
+                                    <i class="fa-solid ${product.icon}"></i>
+                                </span>
+                                <div>
+                                    <h3 class="font-bold text-gray-800 text-base leading-snug">${product.name}</h3>
+                                    <span class="text-xs text-gray-500">單位：${product.unit}</span>
+                                </div>
+                            </div>
+                            <!-- 單項語音按鈕 -->
+                            <button onclick="speakProduct(${product.id})" title="朗讀單價" class="text-amber-600 hover:text-amber-800 hover:bg-amber-100/60 p-2 rounded-full transition active:scale-95">
+                                <i class="fa-solid fa-volume-high text-base"></i>
+                            </button>
+                        </div>
+
+                        <div class="flex items-center justify-between mt-3 pt-2 border-t border-gray-100">
+                            <div class="text-amber-700 font-extrabold text-lg">
+                                $${product.price} <span class="text-xs font-normal text-gray-500">/ ${product.unit}</span>
+                            </div>
+
+                            <!-- 數量控制按鈕 -->
+                            <div class="flex items-center bg-gray-100 rounded-lg p-1 border border-gray-200">
+                                <button onclick="changeQty(${product.id}, -1)" class="w-8 h-8 bg-white hover:bg-gray-200 active:bg-gray-300 text-gray-700 rounded-md font-bold shadow-sm flex items-center justify-center transition disabled:opacity-40" ${qty === 0 ? 'disabled' : ''}>
+                                    <i class="fa-solid fa-minus text-xs"></i>
+                                </button>
+                                <input type="number" min="0" value="${qty}" onchange="setQty(${product.id}, this.value)" class="w-10 text-center bg-transparent font-bold text-gray-800 focus:outline-none text-sm" />
+                                <button onclick="changeQty(${product.id}, 1)" class="w-8 h-8 bg-amber-600 hover:bg-amber-700 active:bg-amber-800 text-white rounded-md font-bold shadow-sm flex items-center justify-center transition">
+                                    <i class="fa-solid fa-plus text-xs"></i>
+                                </button>
+                            </div>
+                        </div>
+                    </div>
+                `;
+            }).join('');
+        }
+
+        function changeQty(productId, delta) {
+            const current = cart[productId] || 0;
+            const newQty = Math.max(0, current + delta);
+            if (newQty === 0) {
+                delete cart[productId];
+            } else {
+                cart[productId] = newQty;
+            }
+            renderProducts();
+            updateSummary();
+        }
+
+        function setQty(productId, value) {
+            const qty = parseInt(value, 10);
+            if (isNaN(qty) || qty <= 0) {
+                delete cart[productId];
+            } else {
+                cart[productId] = qty;
+            }
+            renderProducts();
+            updateSummary();
+        }
+
+        function resetAll() {
+            cart = {};
+            renderProducts();
+            updateSummary();
+            showToast("已清空購物清單");
+        }
+
+        function updateSummary() {
+            const cartList = document.getElementById('cartList');
+            let totalAmount = 0;
+            let totalQty = 0;
+            let itemsHtml = '';
+
+            const selectedIds = Object.keys(cart);
+
+            if (selectedIds.length === 0) {
+                itemsHtml = `
+                    <div class="text-center py-8 text-gray-400">
+                        <i class="fa-solid fa-basket-shopping text-3xl mb-2 text-gray-300"></i>
+                        <p class="text-sm">未勾選商品</p>
+                        <p class="text-xs text-gray-400">點擊加號可快速加入算錢</p>
+                    </div>
+                `;
+            } else {
+                selectedIds.forEach(id => {
+                    const product = products.find(p => p.id == id);
+                    const qty = cart[id];
+                    const subtotal = product.price * qty;
+                    totalAmount += subtotal;
+                    totalQty += qty;
+
+                    itemsHtml += `
+                        <div class="flex justify-between items-center text-sm p-2 bg-amber-50/50 rounded-lg border border-amber-100">
+                            <div>
+                                <span class="font-bold text-gray-800">${product.name}</span>
+                                <span class="text-xs text-gray-500">($${product.price}/${product.unit})</span>
+                            </div>
+                            <div class="flex items-center gap-3">
+                                <span class="text-xs font-semibold bg-amber-200 text-amber-900 px-2 py-0.5 rounded-full">x${qty}</span>
+                                <span class="font-bold text-amber-700 min-w-[50px] text-right">$${subtotal}</span>
+                                <button onclick="changeQty(${product.id}, -${qty})" class="text-gray-400 hover:text-red-500 transition">
+                                    <i class="fa-solid fa-xmark"></i>
+                                </button>
+                            </div>
+                        </div>
+                    `;
+                });
+            }
+
+            cartList.innerHTML = itemsHtml;
+            document.getElementById('totalQty').innerText = `${totalQty} 件`;
+            document.getElementById('totalAmount').innerText = `$${totalAmount}`;
+
+            // Sync Mobile Sticky Bar
+            document.getElementById('mobileTotalQty').innerText = totalQty;
+            document.getElementById('mobileTotalAmount').innerText = `$${totalAmount}`;
+        }
+
+        function speakText(text) {
+            if (!('speechSynthesis' in window)) {
+                showToast("您的瀏覽器不支援語音朗讀功能");
+                return;
+            }
+
+            // 取消正在朗讀的內容
+            window.speechSynthesis.cancel();
+
+            const utterance = new SpeechSynthesisUtterance(text);
+            utterance.lang = 'zh-TW';
+            
+            // 讀取調速滑桿
+            const rateInput = document.getElementById('speechRate');
+            utterance.rate = rateInput ? parseFloat(rateInput.value) : 1;
+
+            window.speechSynthesis.speak(utterance);
+        }
+
+        function speakProduct(id) {
+            const product = products.find(p => p.id === id);
+            if (!product) return;
+            const text = `${product.name} ${product.unit}，${product.price} 元`;
+            speakText(text);
+            showToast(`朗讀：${text}`);
+        }
+
+        function speakSummary() {
+            const selectedIds = Object.keys(cart);
+            if (selectedIds.length === 0) {
+                speakText("目前尚未選擇任何商品。");
+                showToast("購物車為空");
+                return;
+            }
+
+            let textParts = ["您點選的商品有："];
+            let totalAmount = 0;
+
+            selectedIds.forEach(id => {
+                const product = products.find(p => p.id == id);
+                const qty = cart[id];
+                const subtotal = product.price * qty;
+                totalAmount += subtotal;
+                textParts.push(`${product.name} ${qty} ${product.unit.replace('1斤','斤')}`);
+            });
+
+            textParts.push(`總金額一共是 ${totalAmount} 元。謝謝！`);
+            const fullSpeech = textParts.join("，");
+            
+            speakText(fullSpeech);
+            showToast("開始朗讀結帳明細與總額");
+        }
+
+        function showToast(msg) {
+            const toast = document.getElementById('toast');
+            const toastMsg = document.getElementById('toastMsg');
+            toastMsg.innerText = msg;
+            toast.classList.remove('opacity-0');
+            toast.classList.add('opacity-100');
+            
+            setTimeout(() => {
+                toast.classList.remove('opacity-100');
+                toast.classList.add('opacity-0');
+            }, 2500);
+        }
+
+        function scrollToCart() {
+            window.scrollTo({
+                top: document.getElementById('cartList').offsetTop - 100,
+                behavior: 'smooth'
+            });
+        }
+    </script>
+</body>
+</html>
